@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import Icon from '@/components/ui/icon';
+import { useUserStore } from '@/lib/store';
 
 interface Transaction {
   id: string;
@@ -17,8 +18,9 @@ interface Transaction {
 
 const History = () => {
   const [filter, setFilter] = useState('all');
+  const { transactions } = useUserStore();
 
-  const transactions: Transaction[] = [
+  const mockTransactions: Transaction[] = [
     {
       id: '1',
       type: 'buy',
@@ -168,8 +170,9 @@ const History = () => {
     }
   };
 
+  const allTransactions = transactions.length > 0 ? transactions : mockTransactions;
   const filteredTransactions =
-    filter === 'all' ? transactions : transactions.filter((t) => t.type === filter);
+    filter === 'all' ? allTransactions : allTransactions.filter((t) => t.type === filter);
 
   return (
     <div className="space-y-6">
@@ -284,7 +287,7 @@ const History = () => {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">
-              {transactions.filter((t) => t.type === 'buy').length}
+              {allTransactions.filter((t) => t.type === 'buy').length}
             </p>
           </CardContent>
         </Card>
@@ -298,7 +301,7 @@ const History = () => {
           </CardHeader>
           <CardContent>
             <p className="text-3xl font-bold">
-              {transactions.filter((t) => t.type === 'sell').length}
+              {allTransactions.filter((t) => t.type === 'sell').length}
             </p>
           </CardContent>
         </Card>
@@ -311,7 +314,7 @@ const History = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{transactions.length}</p>
+            <p className="text-3xl font-bold">{allTransactions.length}</p>
           </CardContent>
         </Card>
       </div>

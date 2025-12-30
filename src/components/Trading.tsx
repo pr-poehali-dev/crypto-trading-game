@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,49 +8,96 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
-
-interface Balance {
-  [key: string]: number;
-}
+import { useUserStore } from '@/lib/store';
 
 const Trading = () => {
   const { toast } = useToast();
+  const { balances, updateBalance, addTransaction, addXP, unlockAchievement } = useUserStore();
   const [tradeType, setTradeType] = useState<'crypto' | 'fiat'>('crypto');
   const [fromAsset, setFromAsset] = useState('BTC');
   const [toAsset, setToAsset] = useState('USDT');
   const [amount, setAmount] = useState('');
-  
-  const [balances] = useState<Balance>({
-    BTC: 0.5,
-    USDT: 5000,
-    TCOIN: 100,
-    FPICOIN: 250,
-    USD: 2000,
-    RUB: 150000,
-    EUR: 1500,
-    GBP: 1200,
+
+  const [cryptoPrices, setCryptoPrices] = useState({
+    BTC: 43250,
+    USDT: 1,
+    TCOIN: 156.8,
+    FPICOIN: 89.45,
   });
 
+  const [fiatRates, setFiatRates] = useState({
+    USD: 1,
+    RUB: 92.5,
+    EUR: 0.92,
+    GBP: 0.79,
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCryptoPrices((prev) => {
+        const updated = { ...prev };
+        Object.keys(updated).forEach((key) => {
+          if (key !== 'USDT') {
+            const change = (Math.random() - 0.5) * 2;
+            updated[key as keyof typeof prev] = updated[key as keyof typeof prev] * (1 + change / 100);
+          }
+        });
+        return updated;
+      });
+
+      setFiatRates((prev) => {
+        const updated = { ...prev };
+        Object.keys(updated).forEach((key) => {
+          if (key !== 'USD') {
+            const change = (Math.random() - 0.5) * 0.5;
+            updated[key as keyof typeof prev] = updated[key as keyof typeof prev] * (1 + change / 100);
+          }
+        });
+        return updated;
+      });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (tradeType === 'crypto') {
+      setFromAsset('BTC');
+      setToAsset('USDT');
+    } else {
+      setFromAsset('USD');
+      setToAsset('RUB');
+    }
+  }, [tradeType]);
+
   const cryptoAssets = [
-    { symbol: 'BTC', name: 'Bitcoin', price: 43250 },
-    { symbol: 'USDT', name: 'Tether', price: 1 },
-    { symbol: 'TCOIN', name: 'TCoin', price: 156.8 },
-    { symbol: 'FPICOIN', name: 'FPICoin', price: 89.45 },
+    { symbol: 'BTC', name: 'Bitcoin', price: cryptoPrices.BTC },
+    { symbol: 'USDT', name: 'Tether', price: cryptoPrices.USDT },
+    { symbol: 'TCOIN', name: 'TCoin', price: cryptoPrices.TCOIN },
+    { symbol: 'FPICOIN', name: 'FPICoin', price: cryptoPrices.FPICOIN },
   ];
 
   const fiatAssets = [
-    { symbol: 'USD', name: 'US Dollar', rate: 1 },
-    { symbol: 'RUB', name: 'Russian Ruble', rate: 92.5 },
-    { symbol: 'EUR', name: 'Euro', rate: 0.92 },
-    { symbol: 'GBP', name: 'British Pound', rate: 0.79 },
+    { symbol: 'USD', name: 'US Dollar', rate: fiatRates.USD },
+    { symbol: 'RUB', name: 'Russian Ruble', rate: fiatRates.RUB },
+    { symbol: 'EUR', name: 'Euro', rate: fiatRates.EUR },
+    { symbol: 'GBP', name: 'British Pound', rate: fiatRates.GBP },
   ];
 
   const currentAssets = tradeType === 'crypto' ? cryptoAssets : fiatAssets;
   const fromBalance = balances[fromAsset] || 0;
 
+  const getPrice = (asset: string) => {
+    if (tradeType === 'crypto') {
+      return cryptoPrices[asset as keyof typeof cryptoPrices] || 1;
+    } else {
+      return fiatRates[asset as keyof typeof fiatRates] || 1;
+    }
+  };
+
   const handleTrade = (type: 'buy' | 'sell') => {
     const amountNum = parseFloat(amount);
-    
+
     if (!amount || amountNum <= 0) {
       toast({
         title: 'Ошибка',
@@ -63,17 +110,46 @@ const Trading = () => {
     if (type === 'sell' && amountNum > fromBalance) {
       toast({
         title: 'Недостаточно средств',
-        description: `У вас только ${fromBalance} ${fromAsset}`,
+        description: `У вас только ${fromBalance.toFixed(2)} ${fromAsset}`,
         variant: 'destructive',
       });
       return;
     }
 
+    const fromPrice = getPrice(fromAsset);
+    const toPrice = getPrice(toAsset);
+    const convertedAmount = (amountNum * fromPrice) / toPrice;
+
+    if (type === 'buy') {
+      updateBalance(toAsset, -amountNum);
+      updateBalance(fromAsset, convertedAmount);
+      addTransaction({
+        type: 'buy',
+        asset: fromAsset,
+        amount: convertedAmount,
+        price: fromPrice,
+        total: amountNum,
+      });
+    } else {
+      updateBalance(fromAsset, -amountNum);
+      updateBalance(toAsset, convertedAmount);
+      addTransaction({
+        type: 'sell',
+        asset: fromAsset,
+        amount: amountNum,
+        price: fromPrice,
+        total: convertedAmount,
+      });
+    }
+
+    addXP(50);
+    unlockAchievement('1');
+
     toast({
       title: type === 'buy' ? 'Покупка выполнена' : 'Продажа выполнена',
-      description: `${amountNum} ${fromAsset} → ${toAsset}`,
+      description: `${amountNum} ${fromAsset} → ${convertedAmount.toFixed(2)} ${toAsset}`,
     });
-    
+
     setAmount('');
   };
 
@@ -113,7 +189,7 @@ const Trading = () => {
                         <SelectItem key={asset.symbol} value={asset.symbol}>
                           <div className="flex items-center justify-between w-full">
                             <span>{asset.name} ({asset.symbol})</span>
-                            <span className="text-muted-foreground ml-4">${asset.price}</span>
+                            <span className="text-muted-foreground ml-4">${asset.price.toFixed(2)}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -122,7 +198,7 @@ const Trading = () => {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Доступно:</span>
                     <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
-                      {fromBalance} {fromAsset}
+                      {fromBalance.toFixed(4)} {fromAsset}
                     </Badge>
                   </div>
                 </div>
@@ -138,7 +214,7 @@ const Trading = () => {
                         <SelectItem key={asset.symbol} value={asset.symbol}>
                           <div className="flex items-center justify-between w-full">
                             <span>{asset.name} ({asset.symbol})</span>
-                            <span className="text-muted-foreground ml-4">${asset.price}</span>
+                            <span className="text-muted-foreground ml-4">${asset.price.toFixed(2)}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -187,7 +263,10 @@ const Trading = () => {
                     <SelectContent>
                       {fiatAssets.map((asset) => (
                         <SelectItem key={asset.symbol} value={asset.symbol}>
-                          {asset.name} ({asset.symbol})
+                          <div className="flex items-center justify-between w-full">
+                            <span>{asset.name} ({asset.symbol})</span>
+                            <span className="text-muted-foreground ml-4">{asset.rate.toFixed(2)}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -195,7 +274,7 @@ const Trading = () => {
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Доступно:</span>
                     <Badge variant="outline" className="bg-secondary/10 text-secondary border-secondary/30">
-                      {fromBalance} {fromAsset}
+                      {fromBalance.toFixed(2)} {fromAsset}
                     </Badge>
                   </div>
                 </div>
@@ -209,7 +288,10 @@ const Trading = () => {
                     <SelectContent>
                       {fiatAssets.map((asset) => (
                         <SelectItem key={asset.symbol} value={asset.symbol}>
-                          {asset.name} ({asset.symbol})
+                          <div className="flex items-center justify-between w-full">
+                            <span>{asset.name} ({asset.symbol})</span>
+                            <span className="text-muted-foreground ml-4">{asset.rate.toFixed(2)}</span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -264,6 +346,7 @@ const Trading = () => {
                     const [from, to] = pair.split('/');
                     setFromAsset(from);
                     setToAsset(to);
+                    setTradeType(['BTC', 'TCOIN', 'FPICOIN', 'USDT'].includes(from) ? 'crypto' : 'fiat');
                   }}
                 >
                   <span className="font-medium">{pair}</span>

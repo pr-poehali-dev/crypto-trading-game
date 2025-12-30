@@ -2,7 +2,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
 import Icon from '@/components/ui/icon';
+import { useUserStore } from '@/lib/store';
+import { useToast } from '@/hooks/use-toast';
 
 interface Achievement {
   id: string;
@@ -14,10 +17,10 @@ interface Achievement {
 }
 
 const Profile = () => {
-  const userLevel = 12;
-  const userXP = 7500;
-  const nextLevelXP = 10000;
-  const progressPercent = (userXP / nextLevelXP) * 100;
+  const { level, xp, transactions, unlockedAchievements, totalBalance, resetProgress } = useUserStore();
+  const { toast } = useToast();
+  const nextLevelXP = level * 1000;
+  const progressPercent = ((xp % 1000) / 1000) * 100;
 
   const achievements: Achievement[] = [
     {
@@ -25,7 +28,7 @@ const Profile = () => {
       name: 'Первая сделка',
       description: 'Совершите первую покупку или продажу',
       icon: 'Star',
-      unlocked: true,
+      unlocked: unlockedAchievements.includes('1'),
       rarity: 'common',
     },
     {
@@ -33,7 +36,7 @@ const Profile = () => {
       name: 'Опытный трейдер',
       description: 'Совершите 10 успешных сделок',
       icon: 'Zap',
-      unlocked: true,
+      unlocked: unlockedAchievements.includes('2'),
       rarity: 'rare',
     },
     {
@@ -41,7 +44,7 @@ const Profile = () => {
       name: 'Прибыльный день',
       description: 'Заработайте $1000 за один день',
       icon: 'TrendingUp',
-      unlocked: true,
+      unlocked: unlockedAchievements.includes('3'),
       rarity: 'epic',
     },
     {
@@ -49,7 +52,7 @@ const Profile = () => {
       name: 'Холдер',
       description: 'Храните криптовалюту 30 дней',
       icon: 'Shield',
-      unlocked: true,
+      unlocked: unlockedAchievements.includes('4'),
       rarity: 'rare',
     },
     {
@@ -57,7 +60,7 @@ const Profile = () => {
       name: 'Диверсификация',
       description: 'Инвестируйте в 5 разных активов',
       icon: 'Target',
-      unlocked: true,
+      unlocked: unlockedAchievements.includes('5'),
       rarity: 'rare',
     },
     {
@@ -65,7 +68,7 @@ const Profile = () => {
       name: 'Криптомагнат',
       description: 'Достигните баланса $100,000',
       icon: 'Crown',
-      unlocked: false,
+      unlocked: unlockedAchievements.includes('6'),
       rarity: 'legendary',
     },
     {
@@ -73,7 +76,7 @@ const Profile = () => {
       name: 'Быстрая прибыль',
       description: 'Заработайте 20% за одну сделку',
       icon: 'Rocket',
-      unlocked: false,
+      unlocked: unlockedAchievements.includes('7'),
       rarity: 'epic',
     },
     {
@@ -81,16 +84,16 @@ const Profile = () => {
       name: 'Марафонец',
       description: 'Торгуйте 100 дней подряд',
       icon: 'Award',
-      unlocked: false,
+      unlocked: unlockedAchievements.includes('8'),
       rarity: 'legendary',
     },
   ];
 
   const stats = [
-    { label: 'Всего сделок', value: '127', icon: 'Activity', color: 'text-primary' },
-    { label: 'Прибыль', value: '$12,450', icon: 'TrendingUp', color: 'text-success' },
-    { label: 'Точность', value: '78%', icon: 'Target', color: 'text-secondary' },
-    { label: 'Стрик', value: '15 дней', icon: 'Flame', color: 'text-accent' },
+    { label: 'Всего сделок', value: transactions.length.toString(), icon: 'Activity', color: 'text-primary' },
+    { label: 'Баланс', value: `$${totalBalance.toFixed(2)}`, icon: 'TrendingUp', color: 'text-success' },
+    { label: 'Достижения', value: `${unlockedAchievements.length}/8`, icon: 'Trophy', color: 'text-secondary' },
+    { label: 'Уровень', value: level.toString(), icon: 'Award', color: 'text-accent' },
   ];
 
   const leaderboard = [
@@ -98,8 +101,18 @@ const Profile = () => {
     { rank: 2, name: 'TradeWizard', profit: '$98,200', level: 22 },
     { rank: 3, name: 'BitMaster', profit: '$87,500', level: 21 },
     { rank: 4, name: 'ProTrader', profit: '$76,300', level: 20 },
-    { rank: 5, name: 'Вы', profit: '$12,450', level: 12 },
+    { rank: 5, name: 'Вы', profit: `$${totalBalance.toFixed(2)}`, level },
   ];
+
+  const handleReset = () => {
+    if (confirm('Вы уверены, что хотите сбросить весь прогресс? Это действие нельзя отменить.')) {
+      resetProgress();
+      toast({
+        title: 'Прогресс сброшен',
+        description: 'Вы начинаете с 1 уровня!',
+      });
+    }
+  };
 
   const getRarityColor = (rarity: string) => {
     switch (rarity) {
@@ -146,19 +159,27 @@ const Profile = () => {
                 <h2 className="text-3xl font-bold">ProTrader</h2>
                 <Badge variant="outline" className="bg-accent/10 text-accent border-accent/30 w-fit mx-auto md:mx-0">
                   <Icon name="Award" size={14} className="mr-1" />
-                  Уровень {userLevel}
+                  Уровень {level}
                 </Badge>
               </div>
-              <p className="text-muted-foreground mb-4">Опытный криптотрейдер</p>
+              <p className="text-muted-foreground mb-4">Криптотрейдер</p>
               <div className="space-y-2">
                 <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Прогресс до уровня {userLevel + 1}</span>
+                  <span className="text-muted-foreground">Прогресс до уровня {level + 1}</span>
                   <span className="font-semibold">
-                    {userXP.toLocaleString()} / {nextLevelXP.toLocaleString()} XP
+                    {(xp % 1000).toLocaleString()} / 1000 XP
                   </span>
                 </div>
                 <Progress value={progressPercent} className="h-3" />
               </div>
+              <Button
+                onClick={handleReset}
+                variant="outline"
+                className="mt-4 border-destructive/50 text-destructive hover:bg-destructive/10"
+              >
+                <Icon name="RotateCcw" size={16} className="mr-2" />
+                Сбросить прогресс
+              </Button>
             </div>
           </div>
         </CardContent>

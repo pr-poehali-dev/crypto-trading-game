@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Icon from '@/components/ui/icon';
+import { useUserStore } from '@/lib/store';
+import { useToast } from '@/hooks/use-toast';
 import Dashboard from '@/components/Dashboard';
 import Trading from '@/components/Trading';
 import Wallets from '@/components/Wallets';
@@ -9,6 +15,9 @@ import History from '@/components/History';
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const { totalBalance, depositToMain } = useUserStore();
+  const { toast } = useToast();
+  const [depositAmount, setDepositAmount] = useState('');
 
   return (
     <div className="min-h-screen bg-background">
@@ -21,10 +30,61 @@ const Index = () => {
             <h1 className="text-2xl font-bold text-gradient">CryptoTrade</h1>
           </div>
           <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center gap-2 bg-success/10 border border-success/30 px-4 py-2 rounded-lg">
-              <Icon name="Wallet" size={18} className="text-success" />
-              <span className="font-semibold text-success">$12,450.00</span>
-            </div>
+            <Dialog>
+              <DialogTrigger asChild>
+                <button className="hidden md:flex items-center gap-2 bg-success/10 border border-success/30 px-4 py-2 rounded-lg hover:bg-success/20 transition-colors">
+                  <Icon name="Wallet" size={18} className="text-success" />
+                  <span className="font-semibold text-success">${totalBalance.toFixed(2)}</span>
+                </button>
+              </DialogTrigger>
+              <DialogContent className="bg-card border-border">
+                <DialogHeader>
+                  <DialogTitle>Пополнить основной кошелек</DialogTitle>
+                  <DialogDescription>
+                    Добавьте средства на ваш основной баланс
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg bg-muted/30">
+                    <p className="text-sm text-muted-foreground mb-1">Текущий баланс</p>
+                    <p className="text-2xl font-bold text-success">${totalBalance.toFixed(2)}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Сумма пополнения (USD)</Label>
+                    <Input
+                      type="number"
+                      placeholder="Введите сумму"
+                      value={depositAmount}
+                      onChange={(e) => setDepositAmount(e.target.value)}
+                      className="bg-muted border-border"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => {
+                      const amount = parseFloat(depositAmount);
+                      if (!amount || amount <= 0) {
+                        toast({
+                          title: 'Ошибка',
+                          description: 'Введите корректную сумму',
+                          variant: 'destructive',
+                        });
+                        return;
+                      }
+                      depositToMain(amount);
+                      toast({
+                        title: 'Успешно!',
+                        description: `Баланс пополнен на $${amount.toFixed(2)}`,
+                      });
+                      setDepositAmount('');
+                    }}
+                    className="w-full bg-success hover:bg-success/90"
+                  >
+                    <Icon name="Plus" className="mr-2" size={16} />
+                    Пополнить
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
             <button className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center hover:bg-muted/80 transition-colors">
               <Icon name="Bell" size={20} />
             </button>

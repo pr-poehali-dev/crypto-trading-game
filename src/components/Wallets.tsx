@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
 import { useToast } from '@/hooks/use-toast';
+import { useUserStore } from '@/lib/store';
 
 interface Wallet {
   id: string;
@@ -18,16 +19,17 @@ interface Wallet {
 
 const Wallets = () => {
   const { toast } = useToast();
-  const [wallets] = useState<Wallet[]>([
-    { id: '1', type: 'crypto', asset: 'BTC', balance: 0.5, address: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa' },
-    { id: '2', type: 'crypto', asset: 'USDT', balance: 5000, address: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb' },
-    { id: '3', type: 'crypto', asset: 'TCOIN', balance: 100, address: 'TN3W4H6rK2ce4vX9YnFQHwKENnHjoxb3m9' },
-    { id: '4', type: 'crypto', asset: 'FPICOIN', balance: 250, address: 'FP8kZT3eLJvTnM2x5bN9KoP7qW4vRn1Xa' },
-    { id: '5', type: 'fiat', asset: 'USD', balance: 2000 },
-    { id: '6', type: 'fiat', asset: 'RUB', balance: 150000 },
-    { id: '7', type: 'fiat', asset: 'EUR', balance: 1500 },
-    { id: '8', type: 'fiat', asset: 'GBP', balance: 1200 },
-  ]);
+  const { balances, updateBalance, addTransaction } = useUserStore();
+  const wallets: Wallet[] = [
+    { id: '1', type: 'crypto', asset: 'BTC', balance: balances.BTC || 0, address: '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa' },
+    { id: '2', type: 'crypto', asset: 'USDT', balance: balances.USDT || 0, address: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb' },
+    { id: '3', type: 'crypto', asset: 'TCOIN', balance: balances.TCOIN || 0, address: 'TN3W4H6rK2ce4vX9YnFQHwKENnHjoxb3m9' },
+    { id: '4', type: 'crypto', asset: 'FPICOIN', balance: balances.FPICOIN || 0, address: 'FP8kZT3eLJvTnM2x5bN9KoP7qW4vRn1Xa' },
+    { id: '5', type: 'fiat', asset: 'USD', balance: balances.USD || 0 },
+    { id: '6', type: 'fiat', asset: 'RUB', balance: balances.RUB || 0 },
+    { id: '7', type: 'fiat', asset: 'EUR', balance: balances.EUR || 0 },
+    { id: '8', type: 'fiat', asset: 'GBP', balance: balances.GBP || 0 },
+  ];
 
   const [depositAmount, setDepositAmount] = useState('');
   const [depositAddress, setDepositAddress] = useState('');
@@ -51,9 +53,18 @@ const Wallets = () => {
       return;
     }
 
+    const amount = parseFloat(depositAmount);
+    updateBalance(wallet.asset, amount);
+    addTransaction({
+      type: 'deposit',
+      asset: wallet.asset,
+      amount,
+      total: amount,
+    });
+
     toast({
       title: 'Пополнение успешно',
-      description: `+${depositAmount} ${wallet.asset}`,
+      description: `+${amount} ${wallet.asset}`,
     });
 
     setDepositAmount('');

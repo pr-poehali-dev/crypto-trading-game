@@ -1,32 +1,89 @@
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/icon';
+import { useUserStore } from '@/lib/store';
 
 interface CryptoData {
   id: string;
   name: string;
   symbol: string;
   price: number;
+  prevPrice: number;
   change24h: number;
   volume: string;
   trend: 'up' | 'down';
 }
 
-const cryptoData: CryptoData[] = [
-  { id: '1', name: 'Bitcoin', symbol: 'BTC', price: 43250.00, change24h: 2.5, volume: '$28.5B', trend: 'up' },
-  { id: '2', name: 'Tether', symbol: 'USDT', price: 1.00, change24h: 0.01, volume: '$45.2B', trend: 'up' },
-  { id: '3', name: 'TCoin', symbol: 'TCOIN', price: 156.80, change24h: -1.2, volume: '$3.4B', trend: 'down' },
-  { id: '4', name: 'FPICoin', symbol: 'FPICOIN', price: 89.45, change24h: 5.8, volume: '$1.8B', trend: 'up' },
-];
-
-const fiatData = [
-  { name: 'US Dollar', symbol: 'USD', rate: 1.00, change: 0 },
-  { name: 'Russian Ruble', symbol: 'RUB', rate: 92.50, change: 0.3 },
-  { name: 'Euro', symbol: 'EUR', rate: 0.92, change: -0.15 },
-  { name: 'British Pound', symbol: 'GBP', rate: 0.79, change: 0.08 },
-];
-
 const Dashboard = () => {
+  const { totalBalance, balances, level, unlockedAchievements } = useUserStore();
+  
+  const [cryptoData, setCryptoData] = useState<CryptoData[]>([
+    { id: '1', name: 'Bitcoin', symbol: 'BTC', price: 43250.00, prevPrice: 43250.00, change24h: 2.5, volume: '$28.5B', trend: 'up' },
+    { id: '2', name: 'Tether', symbol: 'USDT', price: 1.00, prevPrice: 1.00, change24h: 0.01, volume: '$45.2B', trend: 'up' },
+    { id: '3', name: 'TCoin', symbol: 'TCOIN', price: 156.80, prevPrice: 156.80, change24h: -1.2, volume: '$3.4B', trend: 'down' },
+    { id: '4', name: 'FPICoin', symbol: 'FPICOIN', price: 89.45, prevPrice: 89.45, change24h: 5.8, volume: '$1.8B', trend: 'up' },
+  ]);
+
+  const [fiatData, setFiatData] = useState([
+    { name: 'US Dollar', symbol: 'USD', rate: 1.00, prevRate: 1.00, change: 0 },
+    { name: 'Russian Ruble', symbol: 'RUB', rate: 92.50, prevRate: 92.50, change: 0.3 },
+    { name: 'Euro', symbol: 'EUR', rate: 0.92, prevRate: 0.92, change: -0.15 },
+    { name: 'British Pound', symbol: 'GBP', rate: 0.79, prevRate: 0.79, change: 0.08 },
+  ]);
+
+  const [priceAnimations, setPriceAnimations] = useState<Record<string, 'up' | 'down' | null>>({});
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCryptoData((prev) =>
+        prev.map((crypto) => {
+          const changePercent = (Math.random() - 0.5) * 2;
+          const newPrice = crypto.price * (1 + changePercent / 100);
+          const trend = newPrice > crypto.price ? 'up' : 'down';
+          
+          setPriceAnimations((anims) => ({ ...anims, [crypto.symbol]: trend }));
+          setTimeout(() => {
+            setPriceAnimations((anims) => ({ ...anims, [crypto.symbol]: null }));
+          }, 500);
+
+          return {
+            ...crypto,
+            prevPrice: crypto.price,
+            price: newPrice,
+            change24h: crypto.change24h + changePercent / 10,
+            trend,
+          };
+        })
+      );
+
+      setFiatData((prev) =>
+        prev.map((fiat) => {
+          if (fiat.symbol === 'USD') return fiat;
+          const changePercent = (Math.random() - 0.5) * 0.5;
+          const newRate = fiat.rate * (1 + changePercent / 100);
+
+          return {
+            ...fiat,
+            prevRate: fiat.rate,
+            rate: newRate,
+            change: fiat.change + changePercent / 10,
+          };
+        })
+      );
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const cryptoBalance = Object.entries(balances)
+    .filter(([key]) => ['BTC', 'USDT', 'TCOIN', 'FPICOIN'].includes(key))
+    .reduce((sum, [_, val]) => sum + val, 0);
+
+  const fiatBalance = Object.entries(balances)
+    .filter(([key]) => ['USD', 'RUB', 'EUR', 'GBP'].includes(key))
+    .reduce((sum, [_, val]) => sum + val, 0);
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -36,11 +93,7 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-gradient">$12,450</span>
-              <Badge variant="outline" className="bg-success/10 text-success border-success/30">
-                <Icon name="TrendingUp" size={12} className="mr-1" />
-                +5.2%
-              </Badge>
+              <span className="text-3xl font-bold text-gradient">${totalBalance.toFixed(2)}</span>
             </div>
           </CardContent>
         </Card>
@@ -51,9 +104,9 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold">$8,230</span>
+              <span className="text-3xl font-bold">${cryptoBalance.toFixed(2)}</span>
               <Badge variant="outline" className="bg-primary/10 text-primary border-primary/30">
-                4 активa
+                4 актива
               </Badge>
             </div>
           </CardContent>
@@ -65,9 +118,9 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold">$4,220</span>
+              <span className="text-3xl font-bold">${fiatBalance.toFixed(2)}</span>
               <Badge variant="outline" className="bg-secondary/10 text-secondary border-secondary/30">
-                5 валют
+                4 валюты
               </Badge>
             </div>
           </CardContent>
@@ -79,10 +132,10 @@ const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold">12</span>
+              <span className="text-3xl font-bold">{level}</span>
               <Badge variant="outline" className="bg-accent/10 text-accent border-accent/30">
                 <Icon name="Award" size={12} className="mr-1" />
-                Pro Trader
+                Трейдер
               </Badge>
             </div>
           </CardContent>
@@ -117,7 +170,17 @@ const Dashboard = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold">${crypto.price.toLocaleString()}</p>
+                    <p
+                      className={`font-bold transition-colors duration-500 ${
+                        priceAnimations[crypto.symbol] === 'up'
+                          ? 'text-success'
+                          : priceAnimations[crypto.symbol] === 'down'
+                          ? 'text-destructive'
+                          : ''
+                      }`}
+                    >
+                      ${crypto.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
                     <div className="flex items-center gap-1 justify-end">
                       <Icon
                         name={crypto.trend === 'up' ? 'TrendingUp' : 'TrendingDown'}
@@ -125,7 +188,7 @@ const Dashboard = () => {
                         className={crypto.trend === 'up' ? 'text-success' : 'text-destructive'}
                       />
                       <span className={`text-sm ${crypto.trend === 'up' ? 'text-success' : 'text-destructive'}`}>
-                        {crypto.change24h > 0 ? '+' : ''}{crypto.change24h}%
+                        {crypto.change24h > 0 ? '+' : ''}{crypto.change24h.toFixed(2)}%
                       </span>
                     </div>
                   </div>
@@ -170,7 +233,7 @@ const Dashboard = () => {
                             className={fiat.change > 0 ? 'text-success' : 'text-destructive'}
                           />
                           <span className={`text-sm ${fiat.change > 0 ? 'text-success' : 'text-destructive'}`}>
-                            {fiat.change > 0 ? '+' : ''}{fiat.change}%
+                            {fiat.change > 0 ? '+' : ''}{fiat.change.toFixed(2)}%
                           </span>
                         </>
                       )}
@@ -193,16 +256,24 @@ const Dashboard = () => {
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              { name: 'Первая сделка', icon: 'Star', color: 'text-primary' },
-              { name: '10 сделок', icon: 'Zap', color: 'text-secondary' },
-              { name: 'Прибыль $1000', icon: 'TrendingUp', color: 'text-success' },
-              { name: 'Холдер', icon: 'Shield', color: 'text-accent' },
+              { id: '1', name: 'Первая сделка', icon: 'Star', color: 'text-primary' },
+              { id: '2', name: '10 сделок', icon: 'Zap', color: 'text-secondary' },
+              { id: '3', name: 'Прибыль $1000', icon: 'TrendingUp', color: 'text-success' },
+              { id: '4', name: 'Холдер', icon: 'Shield', color: 'text-accent' },
             ].map((achievement, index) => (
               <div
                 key={index}
-                className="flex flex-col items-center gap-2 p-4 rounded-lg bg-muted/30 hover:bg-muted/50 transition-all"
+                className={`flex flex-col items-center gap-2 p-4 rounded-lg transition-all ${
+                  unlockedAchievements.includes(achievement.id)
+                    ? 'bg-muted/50 hover:bg-muted/70'
+                    : 'bg-muted/20 opacity-50'
+                }`}
               >
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary/20 to-secondary/20 flex items-center justify-center">
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                  unlockedAchievements.includes(achievement.id)
+                    ? 'bg-gradient-to-br from-primary/20 to-secondary/20'
+                    : 'bg-muted/50'
+                }`}>
                   <Icon name={achievement.icon as any} className={achievement.color} size={24} />
                 </div>
                 <p className="text-sm font-medium text-center">{achievement.name}</p>
